@@ -340,6 +340,47 @@ export const checkPaymentStatus = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized to view this payment' });
     }
 
+    // If payment is still pending, try querying M-Pesa for final status
+    if (payment.status === 'pending' && payment.mpesaDetails?.checkoutRequestID) {
+      try {
+        const checkoutRequestID = payment.mpesaDetails.checkoutRequestID;
+        const queryRes = await mpesaService.querySTKPushStatus(checkoutRequestID);
+
+        if (queryRes.success) {
+          const resultCode = Number(queryRes.resultCode);
+          const resultDesc = queryRes.resultDesc;
+
+          // Save query result on payment record
+          payment.mpesaDetails.resultCode = resultCode;
+          payment.mpesaDetails.resultDesc = resultDesc;
+
+          if (resultCode === 0) {
+            // Treat as successful payment (callback might have been missed)
+            payment.status = 'success';
+            payment.mpesaDetails.transactionDate = new Date();
+            await payment.save();
+
+            // Process payment according to purpose
+            if (payment.purpose === 'worker_listing_fee') {
+              await processWorkerPayment(payment);
+            } else if (payment.purpose === 'customer_unlock_fee') {
+              await processCustomerPayment(payment);
+            }
+          } else {
+            // Non-zero result code — mark as failed
+            payment.status = 'failed';
+            await payment.save();
+          }
+        } else {
+          // Query failed — leave payment as pending but include query error
+          payment.mpesaDetails.queryError = queryRes.error || 'Query failed';
+          await payment.save();
+        }
+      } catch (err) {
+        console.error('Error querying M-Pesa for payment status:', err);
+      }
+    }
+
     res.status(200).json({
       status: payment.status,
       payment,

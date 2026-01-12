@@ -20,6 +20,24 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  // When a worker is pending, poll for status updates so they see approval/payment prompt immediately
+  useEffect(() => {
+    let interval;
+    if (isAuthenticated && user?.role === 'worker' && user.applicationStatus === 'pending') {
+      interval = setInterval(async () => {
+        try {
+          await refreshUser();
+        } catch (err) {
+          console.error('Polling refresh failed:', err);
+        }
+      }, 10000); // every 10 seconds
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAuthenticated, user?.role, user?.applicationStatus]);
+
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -72,6 +90,11 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
+  // Allow components to update local user state without calling the API
+  const updateLocalUser = (patch) => {
+    setUser((prev) => ({ ...(prev || {}), ...patch }));
+  };
+
   const adminLogin = async (email, password) => {
     const response = await authAPI.adminLogin({ email, password });
     localStorage.setItem('token', response.data.token);
@@ -116,6 +139,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     checkAuth,
     refreshUser,
+    updateLocalUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

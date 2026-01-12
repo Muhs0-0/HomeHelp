@@ -1,11 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import PaymentPromptBanner from './components/PaymentPromptBanner';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import BrowseWorkers from './pages/BrowseWorkers';
 import WorkerDashboard from './pages/WorkerDashboard';
 import WorkerApplication from './pages/WorkerApplication';
+import WorkerWaiting from './pages/WorkerWaiting';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import './styles/index.css';
@@ -38,6 +40,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        {/* Global payment prompt shown on any page when worker is approved and unpaid */}
+        <PaymentPromptRoot />
+
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
@@ -53,6 +58,14 @@ function App() {
                 <WorkerApplication />
               </ProtectedRoute>
             } 
+          />
+          <Route 
+            path="/worker/waiting"
+            element={
+              <ProtectedRoute allowedRoles={["worker"]}>
+                <WorkerWaiting />
+              </ProtectedRoute>
+            }
           />
           <Route 
             path="/worker/dashboard" 
@@ -83,3 +96,10 @@ function App() {
 }
 
 export default App;
+
+function PaymentPromptRoot() {
+  // This component must be inside AuthProvider to access auth state
+  const { user, refreshUser } = useAuth();
+
+  return <PaymentPromptBanner user={user} onPaymentSuccess={refreshUser} />;
+}

@@ -42,7 +42,7 @@ const PAY_OPTIONS = [
 
 export default function WorkerApplication() {
   const navigate = useNavigate();
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, updateLocalUser } = useAuth();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     age: '',
@@ -265,11 +265,9 @@ export default function WorkerApplication() {
 
       console.log('Application submitted successfully:', response.data); // Debug log
 
-      // Refresh user status after submission
-      await refreshUser();
-
-      // Don't navigate away - let the useEffect handle it based on new status
-      setError('');
+      // Optimistically update local user state to pending to avoid protected API call
+      updateLocalUser({ applicationStatus: 'pending', paymentStatus: 'unpaid' });
+      navigate('/worker/waiting');
     } catch (err) {
       console.error('Application submission error:', err); // Debug log
       console.error('Error response:', err.response?.data); // Debug log
@@ -322,6 +320,16 @@ export default function WorkerApplication() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Worker Application</h1>
           <p className="text-gray-600">Complete your profile to get hired</p>
+          {user?.role === 'worker' && (
+            <div className="mt-4">
+              <button
+                onClick={() => navigate('/worker/dashboard')}
+                className="px-4 py-2 bg-white text-primary border-2 border-primary rounded-lg shadow-sm hover:bg-primary-50"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Progress Bar */}
